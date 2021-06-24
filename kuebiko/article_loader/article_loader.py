@@ -27,7 +27,7 @@ class ArticleLoader(Process):
             try:
                 article = self.download_article(wikidata_id)
             except:
-                # TODO retry multiple times on error
+                # TODO #1 retry multiple times on error
                 print('Error with {}'.format(wikidata_id))
-            # TODO pre process article
+            # TODO #2 pre process article
             self.queue.put(article)

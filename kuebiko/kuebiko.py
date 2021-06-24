@@ -27,7 +27,7 @@ class Kuebiko:
             p.start()
             processes.append(p)
         [p.join() for p in processes]
-        # TODO work with output from queue
+        # TODO #3 work with output from queue
 
     def batch_list(self, to_batch: list, amount_batches: int):
         batches = [[] for _ in range(amount_batches)]
