@@ -1,21 +1,40 @@
 import json
 import os
-from SPARQLWrapper import SPARQLWrapper, JSON
+
 import requests
 from requests.exceptions import RequestException
 from requests.models import HTTPError
+from SPARQLWrapper import JSON, SPARQLWrapper
 
-WIKIDATA_JSON_ENDPOINT = 'https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&ids=<<WIKIDATA_ID>>'
+from kuebiko.article_loader.article_loader import ArticleLoader
+from multiprocessing import Queue
+
 WIKIDATA_SPARQL_ENDPOINT = 'https://query.wikidata.org/sparql'
 
 class Kuebiko:
-    def __init__(self) -> None:
+    def __init__(self, amount_processes: int = 5) -> None:
+        self.amount_processes = amount_processes
         self.sparql = SPARQLWrapper(WIKIDATA_SPARQL_ENDPOINT)
         self.sparql.setReturnFormat(JSON)
+        self.queue = Queue()
 
     def query(self, query_file: str) -> list:
-        dataset = self.load_dataset(query_file)
-        return self.download_wikidata_articles(dataset)
+        wikidata_ids = self.load_dataset(query_file)
+        batches = self.batch_list(wikidata_ids, self.amount_processes)
+        processes = []
+        for i in range(self.amount_processes):
+            p = ArticleLoader(batches[i], self.queue)
+            p.start()
+            processes.append(p)
+        [p.join() for p in processes]
+        # TODO work with output from queue
+
+    def batch_list(self, to_batch: list, amount_batches: int):
+        batches = [[] for _ in range(amount_batches)]
+        for _ in range(len(to_batch) // amount_batches):
+            for i in range(amount_batches):
+                batches[i].append(to_batch.pop())
+        return batches
 
     def read_query_file(self, query_file: str) -> dict:
         if not os.path.exists(query_file):
@@ -37,19 +56,3 @@ class Kuebiko:
             uri = binding['cid']['value']
             wikidata_ids.append(uri.split('/').pop())
         return wikidata_ids
-
-    def download_article(self, wikidata_id: str) -> dict:
-        url = WIKIDATA_JSON_ENDPOINT.replace('<<WIKIDATA_ID>>', wikidata_id)
-        response = requests.get(url)
-        if response.status_code != 200:
-            raise HTTPError(response.text)
-        if 'error' in response.json().keys():
-            raise RequestException(response.text)
-        return response.json()['entities'][wikidata_id]
-
-    def download_wikidata_articles(self, wikidata_ids: list) -> list:
-        articles = []
-        for wikidata_id in wikidata_ids:
-            article = self.download_article(wikidata_id)
-            articles.append(article)
-        return articles
