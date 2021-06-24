@@ -51,6 +51,5 @@ class Kuebiko:
         articles = []
         for wikidata_id in wikidata_ids:
             article = self.download_article(wikidata_id)
-            print(article['title'])
             articles.append(article)
         return articles
