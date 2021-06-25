@@ -22,12 +22,20 @@ class Kuebiko:
         wikidata_ids = self.load_dataset(query_file)
         batches = self.batch_list(wikidata_ids, self.amount_processes)
         processes = []
-        for i in range(self.amount_processes):
-            p = ArticleLoader(batches[i], self.queue)
-            p.start()
+        for batch in batches:
+            p = ArticleLoader(batch, self.queue)
             processes.append(p)
-        [p.join() for p in processes]
-        # TODO #3 work with output from queue
+            p.start()
+        self.processes_queue(len(wikidata_ids))
+        self.queue.clear()
+        for process in processes:
+            process.join()
+
+    def processes_queue(self, amount_ids: int):
+        count = 0
+        while count <= amount_ids:
+            article: dict = self.queue.get()
+            print(article['title'])
 
     def batch_list(self, to_batch: list, amount_batches: int):
         batches = [[] for _ in range(amount_batches)]
